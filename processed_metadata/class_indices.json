@@ -1,0 +1,14 @@
+{
+  "fresh_apple": 0,
+  "fresh_banana": 1,
+  "fresh_bitter_gourd": 2,
+  "fresh_capsicum": 3,
+  "fresh_orange": 4,
+  "fresh_tomato": 5,
+  "stale_apple": 6,
+  "stale_banana": 7,
+  "stale_bitter_gourd": 8,
+  "stale_capsicum": 9,
+  "stale_orange": 10,
+  "stale_tomato": 11
+}

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+mlruns/
+data/
+outputs/
+*.pt
+*.h5
+*.pkl
+*.onnx
