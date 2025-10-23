@@ -10,8 +10,11 @@ Complete MLflow-based MLOps pipeline for multiclass fruit freshness classificati
 2. **Validate → Preprocess → Train → Register**
 
 `python mlops_pipeline/scripts/01_data_validation.py`
+
 `python mlops_pipeline/scripts/02_data_preprocessing.py`
+
 `python mlops_pipeline/scripts/03_train_evaluate_register.py`
+
 
 3. **Serve API**
 
