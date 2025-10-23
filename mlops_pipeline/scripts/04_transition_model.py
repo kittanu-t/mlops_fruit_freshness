@@ -68,6 +68,9 @@ def predict_array(x: np.ndarray) -> np.ndarray:
             preds = np.array(preds)
     return preds
 
+def softmax_entropy(probs: np.ndarray) -> np.ndarray:
+    """compute entropy of softmax probabilities"""
+    return float(-np.sum(probs * np.log(np.clip(probs, 1e-12, 1.0))))
 
 # ======= ENDPOINTS ======= #
 @app.get("/ping")
@@ -83,13 +86,44 @@ async def predict(file: UploadFile = File(...)):
     x = preprocess_pil_image(content)
     probs = predict_array(x)
     if probs.ndim == 1:
-        probs = probs[None, :]
+        probs = probs[None, :]  # (C,) -> (1,C)
 
     p = probs[0]
     top1_idx = int(np.argmax(p))
     top1_label = idx_to_class.get(top1_idx, str(top1_idx))
     top1_conf = float(p[top1_idx])
 
+    # ======== 🔍 OOD detection heuristic ======== #
+    import math
+
+    def softmax_entropy(prob):
+        # ป้องกัน log(0)
+        return float(-np.sum(prob * np.log(np.clip(prob, 1e-12, 1.0))))
+
+    entropy = softmax_entropy(p)
+    top2_conf = float(np.partition(p, -2)[-2])
+    margin = top1_conf - top2_conf
+
+    # เกณฑ์ปรับได้จากการทดลองจริง
+    THRESH_PROB = 0.99      # ต้องมั่นใจสูงถึงจะยอมรับ (กัน false positive)
+    THRESH_ENT  = 0.25      # ถ้า entropy < 0.25 ถือว่ามั่นใจจริง
+    THRESH_MAR  = 0.001     # ถ้า margin น้อยกว่า 0.001 → ถือว่าไม่มั่นใจพอ
+
+    if (top1_conf < THRESH_PROB) or (entropy > THRESH_ENT) or (margin < THRESH_MAR):
+        return {
+            "filename": file.filename,
+            "prediction": None,
+            "ood": True,
+            "message": "Unknown or unrelated image (not recognized as dataset class)",
+            "signals": {
+                "top1_conf": top1_conf,
+                "entropy": entropy,
+                "margin": margin
+            }
+        }
+    # ============================================ #
+
+    # top-k predictions
     topk_idx = np.argsort(p)[::-1][:TOPK]
     topk = [
         {"label": idx_to_class.get(int(i), str(int(i))), "prob": float(p[int(i)])}
@@ -100,4 +134,5 @@ async def predict(file: UploadFile = File(...)):
         "filename": file.filename,
         "prediction": {"label": top1_label, "prob": top1_conf},
         "topk": topk,
+        "ood": False
     }
