@@ -68,9 +68,6 @@ def predict_array(x: np.ndarray) -> np.ndarray:
             preds = np.array(preds)
     return preds
 
-def softmax_entropy(probs: np.ndarray) -> np.ndarray:
-    """compute entropy of softmax probabilities"""
-    return float(-np.sum(probs * np.log(np.clip(probs, 1e-12, 1.0))))
 
 # ======= ENDPOINTS ======= #
 @app.get("/ping")
@@ -94,7 +91,7 @@ async def predict(file: UploadFile = File(...)):
     top1_conf = float(p[top1_idx])
 
     # ======== 🔍 OOD detection heuristic ======== #
-    import math
+
 
     def softmax_entropy(prob):
         # ป้องกัน log(0)
@@ -104,10 +101,9 @@ async def predict(file: UploadFile = File(...)):
     top2_conf = float(np.partition(p, -2)[-2])
     margin = top1_conf - top2_conf
 
-    # เกณฑ์ปรับได้จากการทดลองจริง
-    THRESH_PROB = 0.99      # ต้องมั่นใจสูงถึงจะยอมรับ (กัน false positive)
-    THRESH_ENT  = 0.25      # ถ้า entropy < 0.25 ถือว่ามั่นใจจริง
-    THRESH_MAR  = 0.001     # ถ้า margin น้อยกว่า 0.001 → ถือว่าไม่มั่นใจพอ
+    THRESH_PROB = 0.99
+    THRESH_ENT = 0.25
+    THRESH_MAR = 0.001
 
     if (top1_conf < THRESH_PROB) or (entropy > THRESH_ENT) or (margin < THRESH_MAR):
         return {
