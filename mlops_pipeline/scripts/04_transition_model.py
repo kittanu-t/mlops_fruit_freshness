@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # ======= CONFIG (ปรับได้) ======= #
 MODEL_NAME = "fruits-freshness-classifier"
 MODEL_URI = f"models:/{MODEL_NAME}@Production"
-IMG_SIZE = (224, 224)
+IMG_SIZE = (160, 160)
 CLASSES_JSON = "processed_metadata/class_indices.json"
 TOPK = 5
 
