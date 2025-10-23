@@ -92,7 +92,6 @@ async def predict(file: UploadFile = File(...)):
 
     # ======== 🔍 OOD detection heuristic ======== #
 
-
     def softmax_entropy(prob):
         # ป้องกัน log(0)
         return float(-np.sum(prob * np.log(np.clip(prob, 1e-12, 1.0))))
