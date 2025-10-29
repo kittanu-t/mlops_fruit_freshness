@@ -92,8 +92,7 @@ async def predict(file: UploadFile = File(...)):
     top1_conf = float(p[top1_idx])
 
     # ---------- OOD heuristics ----------
-    
-    
+
     def softmax_entropy(prob: np.ndarray) -> float:
         return float(-np.sum(prob * np.log(np.clip(prob, 1e-12, 1.0))))
 
