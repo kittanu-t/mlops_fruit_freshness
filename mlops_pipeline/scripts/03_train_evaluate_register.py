@@ -17,12 +17,11 @@ from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
 from tensorflow.keras import Model
 import tensorflow as tf
-import os
 
 # ======== CONFIG ======== #
 TRAIN_DIR = "data_splits/train"
 VAL_DIR = "data_splits/val"
-IMAGE_SIZE = (160, 160)      # ลดขนาดลงเพื่อให้ CPU เร็วขึ้น
+IMAGE_SIZE = (160, 160)  # ลดขนาดลงเพื่อให้ CPU เร็วขึ้น
 BATCH_SIZE = 16
 EPOCHS_STAGE1 = 10
 EPOCHS_STAGE2 = 3
@@ -114,7 +113,7 @@ def run():
             "dropout": DROPOUT_RATE,
             "model_base": "MobileNetV2",
             "base_layers_total": len(base_model.layers),
-            "base_layers_frozen_initial": sum(1 for l in base_model.layers if not l.trainable),
+            "base_layers_frozen_initial": sum(1 for layer in base_model.layers if not layer.trainable),
             "train_samples": tg.samples,
             "val_samples": vg.samples,
             "num_classes": tg.num_classes,
