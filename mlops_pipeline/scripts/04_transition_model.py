@@ -79,21 +79,21 @@ def ping():
 async def predict(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded.")
+
     content = await file.read()
     x = preprocess_pil_image(content)
     probs = predict_array(x)
     if probs.ndim == 1:
-        probs = probs[None, :]  # (C,) -> (1,C)
+        probs = probs[None, :]  # (C,) -> (1, C)
 
     p = probs[0]
     top1_idx = int(np.argmax(p))
     top1_label = idx_to_class.get(top1_idx, str(top1_idx))
     top1_conf = float(p[top1_idx])
 
-    # ======== 🔍 OOD detection heuristic ======== #
 
-    def softmax_entropy(prob):
-        # ป้องกัน log(0)
+    # ---------- OOD heuristics ----------
+    def softmax_entropy(prob: np.ndarray) -> float:
         return float(-np.sum(prob * np.log(np.clip(prob, 1e-12, 1.0))))
 
     entropy = softmax_entropy(p)
@@ -103,31 +103,35 @@ async def predict(file: UploadFile = File(...)):
     THRESH_PROB = 0.99
     THRESH_ENT = 0.25
     THRESH_MAR = 0.001
+    # -----------------------------------
 
-    if (top1_conf < THRESH_PROB) or (entropy > THRESH_ENT) or (margin < THRESH_MAR):
-        return {
-            "filename": file.filename,
-            "prediction": None,
-            "ood": True,
-            "message": "Unknown or unrelated image (not recognized as dataset class)",
-            "signals": {
-                "top1_conf": top1_conf,
-                "entropy": entropy,
-                "margin": margin
-            }
-        }
-    # ============================================ #
-
-    # top-k predictions
+    # top-k (คำนวณไว้ก่อน แล้วค่อยคืนตามกิ่ง)
     topk_idx = np.argsort(p)[::-1][:TOPK]
     topk = [
         {"label": idx_to_class.get(int(i), str(int(i))), "prob": float(p[int(i)])}
         for i in topk_idx
     ]
 
+    is_ood = (top1_conf < THRESH_PROB) or (entropy > THRESH_ENT) or (margin < THRESH_MAR)
+
+    if is_ood:
+        return {
+            "filename": file.filename,
+            "class": None,
+            "confidence": top1_conf,
+            "prediction": None,
+            "topk": [],
+            "ood": True,
+            "message": "Unknown or unrelated image (not recognized as dataset class)",
+            "signals": {"top1_conf": top1_conf, "entropy": entropy, "margin": margin},
+        }
+
     return {
         "filename": file.filename,
+        "class": top1_label,                
+        "confidence": top1_conf,             
         "prediction": {"label": top1_label, "prob": top1_conf},
         "topk": topk,
-        "ood": False
+        "ood": False,
+        "signals": {"top1_conf": top1_conf, "entropy": entropy, "margin": margin},
     }
