@@ -4,6 +4,7 @@ CPU-friendly version: Transfer Learning (MobileNetV2)
 - Feature extraction + Fine-tuning (2-phase)
 - EarlyStopping + ReduceLROnPlateau
 - Logs + Registers to MLflow
+- **Added:** mlflow.log_params(...) to record hyperparameters (no autolog)
 """
 
 import numpy as np
@@ -16,6 +17,7 @@ from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
 from tensorflow.keras import Model
 import tensorflow as tf
+import os
 
 # ======== CONFIG ======== #
 TRAIN_DIR = "data_splits/train"
@@ -24,6 +26,9 @@ IMAGE_SIZE = (160, 160)      # ลดขนาดลงเพื่อให้ 
 BATCH_SIZE = 16
 EPOCHS_STAGE1 = 10
 EPOCHS_STAGE2 = 3
+LR_STAGE1 = 1e-3
+LR_STAGE2 = 1e-5
+DROPOUT_RATE = 0.3
 THRESH_ACC = 0.85
 THRESH_F1W = 0.85
 EXPERIMENT = "Fruits Freshness - Model Training (CPU)"
@@ -40,12 +45,12 @@ def build_model(input_shape, num_classes):
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     x = Dense(128, activation="relu")(x)
-    x = Dropout(0.3)(x)
+    x = Dropout(DROPOUT_RATE)(x)
     outputs = Dense(num_classes, activation="softmax")(x)
 
     model = Model(inputs=base_model.input, outputs=outputs)
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LR_STAGE1),
         loss="categorical_crossentropy",
         metrics=["accuracy"]
     )
@@ -94,6 +99,31 @@ def run():
         input_shape = IMAGE_SIZE + (3,)
         model, base_model = build_model(input_shape, tg.num_classes)
 
+        # -----------------------
+        # LOG PARAMETERS to MLflow
+        # -----------------------
+        # Log main hyperparameters explicitly so they appear under "Parameters" in MLflow UI
+        params_to_log = {
+            "image_size": f"{IMAGE_SIZE[0]}x{IMAGE_SIZE[1]}",
+            "batch_size": BATCH_SIZE,
+            "epochs_stage1": EPOCHS_STAGE1,
+            "epochs_stage2": EPOCHS_STAGE2,
+            "lr_stage1": LR_STAGE1,
+            "lr_stage2": LR_STAGE2,
+            "optimizer": "Adam",
+            "dropout": DROPOUT_RATE,
+            "model_base": "MobileNetV2",
+            "base_layers_total": len(base_model.layers),
+            "base_layers_frozen_initial": sum(1 for l in base_model.layers if not l.trainable),
+            "train_samples": tg.samples,
+            "val_samples": vg.samples,
+            "num_classes": tg.num_classes,
+            "threshold_acc": THRESH_ACC,
+            "threshold_f1w": THRESH_F1W
+        }
+        mlflow.log_params(params_to_log)
+        # -----------------------
+
         # === Phase 1: Feature Extraction === #
         early_stop = EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True, verbose=1)
         reduce_lr = ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=1, min_lr=1e-6, verbose=1)
@@ -116,7 +146,7 @@ def run():
             layer.trainable = True
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=LR_STAGE2),
             loss="categorical_crossentropy",
             metrics=["accuracy"]
         )
@@ -142,6 +172,7 @@ def run():
             "val_f1_macro": f1m
         })
 
+        # Log model artifact
         mlflow.tensorflow.log_model(model, "model")
         passed = (acc >= THRESH_ACC) or (f1w >= THRESH_F1W)
         mlflow.set_tag("passed_threshold", str(passed))
