@@ -91,8 +91,10 @@ async def predict(file: UploadFile = File(...)):
     top1_label = idx_to_class.get(top1_idx, str(top1_idx))
     top1_conf = float(p[top1_idx])
 
-
+    # FIX [E303]: Ensured only one blank line before this comment
     # ---------- OOD heuristics ----------
+    
+    # FIX [E306]: Added 1 blank line before nested function
     def softmax_entropy(prob: np.ndarray) -> float:
         return float(-np.sum(prob * np.log(np.clip(prob, 1e-12, 1.0))))
 
@@ -128,8 +130,8 @@ async def predict(file: UploadFile = File(...)):
 
     return {
         "filename": file.filename,
-        "class": top1_label,                
-        "confidence": top1_conf,             
+        "class": top1_label,          # FIX [W291]: Removed trailing whitespace
+        "confidence": top1_conf,      # FIX [W291]: Removed trailing whitespace
         "prediction": {"label": top1_label, "prob": top1_conf},
         "topk": topk,
         "ood": False,
